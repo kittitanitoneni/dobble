@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Márton-napi Dobble</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706, #b45309);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .card {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1), inset 0 -4px 6px rgba(0,0,0,0.1);
+        }
+
+        .symbol-image {
+            position: absolute;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s ease;
+            filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.3));
+            transform-origin: center center;
+        }
+
+        .symbol-image:hover {
+            filter: drop-shadow(4px 8px 5px rgba(0,0,0,0.4)) brightness(1.1);
+        }
+
+        .animate-correct {
+            animation: correctMatch 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .animate-wrong {
+            animation: wrongMatch 0.4s ease-in-out;
+        }
+
+        @keyframes correctMatch {
+            0%, 100% { transform: scale(1); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+            50% { 
+                transform: scale(1.05); 
+                background-color: #fef08a;
+                box-shadow: 0 0 40px 15px #fde047, inset 0 -4px 6px rgba(0,0,0,0.1); 
+            }
+        }
+
+        @keyframes wrongMatch {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-15px); }
+            40% { transform: translateX(15px); }
+            60% { transform: translateX(-10px); }
+            80% { transform: translateX(10px); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen overflow-hidden text-slate-800 relative w-full">
+
+    <!-- Kezdőképernyő -->
+    <div id="setup-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div class="bg-white/95 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl text-center max-w-md w-full border-4 border-amber-200">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-600 mb-6 drop-shadow-sm">Márton-napi Dobble</h1>
+            
+            <p class="text-xl font-semibold text-gray-700 mb-2">Játékidő:</p>
+            <select id="time-select" class="text-xl p-3 border-4 border-amber-100 rounded-2xl mb-6 w-full font-bold text-center focus:outline-none focus:border-amber-400 bg-white text-amber-900 shadow-inner cursor-pointer appearance-none">
+                <option value="30">30 másodperc</option>
+                <option value="60" selected>1 perc</option>
+                <option value="120">2 perc</option>
+                <option value="300">5 perc</option>
+            </select>
+
+            <p class="text-xl font-semibold text-gray-700 mb-2">Ikonok kártyánként:</p>
+            <select id="icons-select" class="text-xl p-3 border-4 border-amber-100 rounded-2xl mb-8 w-full font-bold text-center focus:outline-none focus:border-amber-400 bg-white text-amber-900 shadow-inner cursor-pointer appearance-none">
+                <option value="3">3 ikon (Könnyű)</option>
+                <option value="4">4 ikon (Közepes)</option>
+                <option value="6">6 ikon (Normál)</option>
+                <option value="8" selected>8 ikon (Nehéz - Teljes pakli)</option>
+            </select>
+            
+            <button id="start-btn" onclick="startNewGame()" disabled class="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white font-bold py-4 px-8 rounded-2xl text-2xl shadow-[0_6px_0_#9a3412] active:shadow-[0_0px_0_#9a3412] active:translate-y-[6px] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Betöltés...
+            </button>
+        </div>
+    </div>
+
+    <!-- Játéktér UI -->
+    <div id="game-ui" class="hidden flex-col items-center w-full max-w-5xl mx-auto h-full justify-between z-10 py-8 px-4">
+        
+        <div class="flex items-center justify-between w-full px-2 md:px-8">
+            <div class="bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-amber-200 text-amber-900 font-bold text-2xl md:text-3xl flex items-center gap-2">
+                ⏱️ <span id="timer-display" class="drop-shadow-sm tracking-wider w-16 text-center">1:00</span>
+            </div>
+            <div class="bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-amber-200 text-amber-900 font-bold text-2xl md:text-3xl">
+                Párok: <span id="score" class="text-orange-600 drop-shadow-sm">0</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-20 w-full flex-grow my-4">
+            <div id="card1" class="card w-[280px] h-[280px] md:w-[350px] md:h-[350px] rounded-full bg-white relative border-8 border-white"></div>
+            <div id="card2" class="card w-[280px] h-[280px] md:w-[350px] md:h-[350px] rounded-full bg-white relative border-8 border-white"></div>
+        </div>
+
+        <div class="mb-4">
+            <button onclick="showSetup()" class="bg-white/90 backdrop-blur-md hover:bg-white text-amber-900 font-bold py-3 px-8 rounded-full text-xl shadow-lg border border-amber-200 transition-all">
+                Újraindítás
+            </button>
+        </div>
+    </div>
+
+    <!-- Idő lejárta -->
+    <div id="game-over" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 md:p-12 text-center max-w-lg w-full shadow-2xl transform scale-105 border-4 border-orange-400">
+            <h2 class="text-5xl font-extrabold text-orange-600 mb-4 drop-shadow-sm">Lejárt az idő!</h2>
+            <div class="text-3xl font-bold mb-8 text-gray-700">
+                Megtalált párok száma: <br>
+                <span id="final-score" class="text-7xl text-amber-500 drop-shadow-md mt-4 block">0</span>
+            </div>
+            <button onclick="showSetup()" class="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold py-4 px-8 rounded-2xl text-2xl shadow-[0_6px_0_#065f46] active:shadow-[0_0px_0_#065f46] active:translate-y-[6px] transition-all">
+                Új Játék
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let SYMBOLS = [];
+        let fetchedRawSymbols = [];
+        const JSON_URL = 'https://kittitanitoneni.github.io/dobble/pic.json';
+        const BASE_IMAGE_URL = 'https://kittitanitoneni.github.io/dobble/';
+
+        // Szimbólumok betöltése induláskor a JSON-ből
+        window.addEventListener('DOMContentLoaded', async () => {
+            const startBtn = document.getElementById('start-btn');
+            try {
+                const response = await fetch(JSON_URL);
+                fetchedRawSymbols = await response.json();
+                startBtn.disabled = false;
+                startBtn.innerText = "Játék Indítása";
+            } catch (err) {
+                console.error("Hiba a JSON betöltésekor:", err);
+                startBtn.innerText = "Hiba a betöltéskor!";
+            }
+        });
+
+        let deck = [];
+        let currentCard1 = [];
+        let currentCard2 = [];
+        let score = 0;
+        let isAnimating = false;
+        let timerInterval;
+        let timeLeft = 0;
+        let currentN = 5;
+
+        let fullDeck = [];
+        let symbolsList = [];
+        let matchQueue = [];
+        let currentMatch = null;
+        let matchesPlayedInCycle = 0;
+        let cycleCount = 0;
+
+        const CYCLE_GRADIENTS = [
+            "linear-gradient(135deg, #fbbf24, #f59e0b, #d97706, #b45309)", // Narancs/Borostyán (Alap)
+            "linear-gradient(135deg, #34d399, #10b981, #059669, #047857)", // Smaragdzöld
+            "linear-gradient(135deg, #60a5fa, #3b82f6, #2563eb, #1d4ed8)", // Kék
+            "linear-gradient(135deg, #a78bfa, #8b5cf6, #7c3aed, #6d28d9)", // Lila
+            "linear-gradient(135deg, #f472b6, #ec4899, #db2777, #be185d)"  // Rózsaszín/Piros
+        ];
+
+        const card1El = document.getElementById('card1');
+        const card2El = document.getElementById('card2');
+        const scoreEl = document.getElementById('score');
+        const finalScoreEl = document.getElementById('final-score');
+        const timerDisplay = document.getElementById('timer-display');
+        const setupScreen = document.getElementById('setup-screen');
+        const gameUI = document.getElementById('game-ui');
+        const gameOverModal = document.getElementById('game-over');
+
+        // Algoritmus a pakli generálásához
+        function generateDeck(n) {
+            let newDeck = [];
+            let firstCard = [];
+            for (let i = 0; i <= n; i++) firstCard.push(SYMBOLS[i]);
+            newDeck.push(firstCard);
+
+            for (let i = 0; i < n; i++) {
+                let card = [SYMBOLS[0]];
+                for (let j = 0; j < n; j++) card.push(SYMBOLS[(n + 1) + i * n + j]);
+                newDeck.push(card);
+            }
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    let card = [SYMBOLS[i + 1]];
+                    for (let k = 0; k < n; k++) {
+                        let idx = (n + 1) + k * n + ((i * k + j) % n);
+                        card.push(SYMBOLS[idx]);
+                    }
+                    newDeck.push(card);
+                }
+            }
+            return newDeck;
+        }
+
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Biztonságos pozíciók a kártyán az egymásra lógás elkerülésére
+        function getPositions(k) {
+            if (k === 3) {
+                return [ {x: 50, y: 25}, {x: 25, y: 70}, {x: 75, y: 70} ];
+            } else if (k === 4) {
+                return [ {x: 30, y: 30}, {x: 70, y: 30}, {x: 30, y: 70}, {x: 70, y: 70} ];
+            } else if (k === 6) {
+                return [
+                    {x: 50, y: 50}, {x: 50, y: 15}, {x: 82, y: 40},
+                    {x: 70, y: 78}, {x: 30, y: 78}, {x: 18, y: 40}
+                ];
+            } else {
+                return [
+                    {x: 32, y: 32}, {x: 68, y: 32}, {x: 32, y: 68}, {x: 68, y: 68},
+                    {x: 50, y: 12}, {x: 88, y: 50}, {x: 50, y: 88}, {x: 12, y: 50}
+                ];
+            }
+        }
+
+        function showSetup() {
+            clearInterval(timerInterval);
+            document.body.style.background = CYCLE_GRADIENTS[0];
+            document.body.style.backgroundSize = "400% 400%";
+            setupScreen.classList.remove('hidden');
+            gameUI.classList.add('hidden');
+            gameOverModal.classList.add('hidden');
+        }
+
+        // Két szimbólumhoz megkeresi a pakliban azt az EGYETLEN kártyát, amin mindkettő szerepel
+        function findCard(symA, symB, deck) {
+            return deck.find(card => card.includes(symA) && card.includes(symB));
+        }
+
+        // Intelligens algoritmus, ami legenerálja az összes ikon véletlenszerű, de érvényes sorrendjét
+        function getValidMatchSequence(symbols, prev1, prev2) {
+            let n = symbols.length;
+            let result = [];
+            let used = new Set();
+            
+            function dfs() {
+                if (result.length === n) return true;
+                
+                let candidates = symbols.filter(s => !used.has(s));
+                candidates = shuffle(candidates);
+                
+                for (let cand of candidates) {
+                    let len = result.length;
+                    
+                    // Ellenőrizzük, hogy a kiválasztott ikon nem okoz-e ismétlődést a kártyákban
+                    if (len === 0) {
+                        if (prev1 && prev2) {
+                            let c = findCard(prev2, prev1, fullDeck);
+                            if (c && c.includes(cand)) continue;
+                        }
+                    } else if (len === 1) {
+                        if (prev1) {
+                            let c = findCard(prev1, result[0], fullDeck);
+                            if (c && c.includes(cand)) continue;
+                        }
+                    } else {
+                        let c = findCard(result[len - 2], result[len - 1], fullDeck);
+                        if (c && c.includes(cand)) continue;
+                    }
+                    
+                    result.push(cand);
+                    used.add(cand);
+                    if (dfs()) return true;
+                    used.delete(cand);
+                    result.pop();
+                }
+                return false;
+            }
+            
+            if (!dfs()) {
+                console.warn("DFS fallback used");
+                return shuffle([...symbols]);
+            }
+            return result;
+        }
+
+        function updateBackgroundColor(cycleIndex) {
+            document.body.style.background = CYCLE_GRADIENTS[cycleIndex % CYCLE_GRADIENTS.length];
+            document.body.style.backgroundSize = "400% 400%";
+        }
+
+        function startNewGame() {
+            const timeSelect = document.getElementById('time-select');
+            const iconsSelect = document.getElementById('icons-select');
+            
+            timeLeft = parseInt(timeSelect.value, 10);
+            const k = parseInt(iconsSelect.value, 10);
+            currentN = k - 1; 
+
+            // --- Szimbólumok feltöltése a JSON-ből a kiválasztott nehézség alapján ---
+            const requiredCount = currentN * currentN + currentN + 1;
+            SYMBOLS = [];
+            for(let i = 0; i < requiredCount; i++) {
+                let item = fetchedRawSymbols[i];
+                if (!item) {
+                    SYMBOLS.push("❓"); // Biztonsági tartalék, ha nincs elég adat a fájlban
+                } else if (item.pic) {
+                    SYMBOLS.push(BASE_IMAGE_URL + item.pic);
+                } else if (item.emoji) {
+                    SYMBOLS.push(item.emoji);
+                }
+            }
+            
+            setupScreen.classList.add('hidden');
+            gameOverModal.classList.add('hidden');
+            gameUI.classList.remove('hidden');
+            gameUI.classList.add('flex');
+            
+            score = 0;
+            scoreEl.textContent = score;
+            timerDisplay.textContent = formatTime(timeLeft);
+            
+            // Játéktér és ciklusok intelligens felépítése
+            fullDeck = generateDeck(currentN);
+            symbolsList = [...new Set(fullDeck.flat())];
+            cycleCount = 0;
+            matchesPlayedInCycle = 0;
+            
+            matchQueue = getValidMatchSequence(symbolsList, null, null);
+            
+            let dummy = symbolsList.find(s => {
+                if (s === matchQueue[0] || s === matchQueue[1]) return false;
+                let c = findCard(s, matchQueue[0], fullDeck);
+                return c && !c.includes(matchQueue[1]);
+            });
+            if (!dummy) dummy = symbolsList.find(s => s !== matchQueue[0] && s !== matchQueue[1]);
+            
+            currentMatch = matchQueue.shift();
+            let nextMatch = matchQueue[0];
+            
+            currentCard1 = findCard(dummy, currentMatch, fullDeck);
+            currentCard2 = findCard(currentMatch, nextMatch, fullDeck);
+            
+            updateBackgroundColor(cycleCount);
+            
+            renderCard(card1El, currentCard1);
+            renderCard(card2El, currentCard2);
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = formatTime(timeLeft);
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function createSymbolImage(symbol) {
+            const img = document.createElement('img');
+            img.className = 'symbol-image';
+            img.draggable = false;
+            
+            // Ha a szimbólum http-vel kezdődik (tehát link), betölti sima képként
+            if (symbol.startsWith('http') || symbol.startsWith('data:')) {
+                img.src = symbol;
+            } else {
+                // Ha a szimbólum egy emoji, akkor röptében generál belőle egy vektoros (SVG) képet!
+                const svg = `<svg viewBox="0 0 100 100" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><text x="50" y="55" dominant-baseline="middle" text-anchor="middle" font-size="80">${symbol}</text></svg>`;
+                img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+            }
+            return img;
+        }
+
+        function renderCard(element, cardData) {
+            element.innerHTML = '';
+            const shuffledSymbols = shuffle([...cardData]);
+            const k = cardData.length;
+            
+            const baseWidth = k <= 4 ? 35 : (k <= 6 ? 26 : 20); 
+            let positions = shuffle([...getPositions(k)]);
+
+            shuffledSymbols.forEach((symbol, index) => {
+                const img = createSymbolImage(symbol);
+                const pos = positions[index];
+                
+                const maxJitter = k <= 4 ? 3 : 1.5; 
+                const jitterX = (Math.random() * maxJitter * 2) - maxJitter;
+                const jitterY = (Math.random() * maxJitter * 2) - maxJitter;
+
+                const x = pos.x + jitterX;
+                const y = pos.y + jitterY;
+                
+                const sizeMod = 0.85 + Math.random() * 0.35; 
+                const rotation = Math.floor(Math.random() * 360);
+                
+                img.style.left = `${x}%`;
+                img.style.top = `${y}%`;
+                img.style.width = `${baseWidth * sizeMod}%`;
+                img.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+                
+                img.onclick = () => handleSymbolClick(symbol);
+                img.ontouchstart = (e) => {
+                    e.preventDefault(); 
+                    handleSymbolClick(symbol);
+                };
+                
+                element.appendChild(img);
+            });
+        }
+
+        function handleSymbolClick(clickedSymbol) {
+            if (isAnimating || timeLeft <= 0) return;
+
+            const match = currentCard1.find(sym => currentCard2.includes(sym));
+
+            if (clickedSymbol === match) {
+                isAnimating = true;
+                score++;
+                scoreEl.textContent = score;
+
+                card1El.classList.add('animate-correct');
+                card2El.classList.add('animate-correct');
+
+                setTimeout(() => {
+                    card1El.classList.remove('animate-correct');
+                    card2El.classList.remove('animate-correct');
+                    nextRound();
+                    isAnimating = false;
+                }, 400); 
+            } else {
+                isAnimating = true;
+                card1El.classList.add('animate-wrong');
+                card2El.classList.add('animate-wrong');
+
+                setTimeout(() => {
+                    card1El.classList.remove('animate-wrong');
+                    card2El.classList.remove('animate-wrong');
+                    isAnimating = false;
+                }, 400);
+            }
+        }
+
+        function nextRound() {
+            let prevMatch = currentMatch;
+            currentCard1 = currentCard2;
+            
+            matchesPlayedInCycle++;
+            // Ha végigmentünk az összes létező ikonon a ciklusban
+            if (matchesPlayedInCycle === symbolsList.length) {
+                cycleCount++;
+                matchesPlayedInCycle = 0;
+                updateBackgroundColor(cycleCount); // Háttérszín váltás!
+            }
+            
+            currentMatch = matchQueue.shift();
+            
+            // Ha kifogytunk az előre megtervezett párokból, generálunk egy új ciklust
+            if (matchQueue.length === 0) {
+                let newCycle = getValidMatchSequence(symbolsList, currentMatch, prevMatch);
+                matchQueue.push(...newCycle);
+            }
+            
+            let nextMatch = matchQueue[0];
+            currentCard2 = findCard(currentMatch, nextMatch, fullDeck);
+            
+            renderCard(card1El, currentCard1);
+            renderCard(card2El, currentCard2);
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            finalScoreEl.textContent = score;
+            gameOverModal.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
