@@ -1,5 +1,5 @@
 [
-  { "pic": "Konteneriskola.jpg" , "maxangle": "45" },
+  { "pic": "Konteneriskola.jpg" , "maxangle": 45 },
   { "pic": "Iskola.jpg" },
   { "pic": "Templom.jpg" },
   { "pic": "Muvelodesihaz.jpg" },
