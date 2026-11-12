@@ -2,7 +2,10 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Dobble">
     <title>Márton-napi Dobble</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -33,12 +36,12 @@
             cursor: pointer;
             user-select: none;
             transition: transform 0.15s ease;
-            filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.3));
             transform-origin: center center;
+            object-fit: contain;
         }
 
         .symbol-image:hover {
-            filter: drop-shadow(4px 8px 5px rgba(0,0,0,0.4)) brightness(1.1);
+            transform: scale(1.15);
         }
 
         .animate-correct {
@@ -53,7 +56,6 @@
             0%, 100% { transform: scale(1); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
             50% { 
                 transform: scale(1.05); 
-                background-color: #fef08a;
                 box-shadow: 0 0 40px 15px #fde047, inset 0 -4px 6px rgba(0,0,0,0.1); 
             }
         }
@@ -74,12 +76,21 @@
         <div class="bg-white/95 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl text-center max-w-md w-full border-4 border-amber-200">
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-600 mb-6 drop-shadow-sm">Márton-napi Dobble</h1>
             
-            <p class="text-xl font-semibold text-gray-700 mb-2">Játékidő:</p>
-            <select id="time-select" class="text-xl p-3 border-4 border-amber-100 rounded-2xl mb-6 w-full font-bold text-center focus:outline-none focus:border-amber-400 bg-white text-amber-900 shadow-inner cursor-pointer appearance-none">
-                <option value="30">30 másodperc</option>
-                <option value="60" selected>1 perc</option>
-                <option value="120">2 perc</option>
-                <option value="300">5 perc</option>
+            <p class="text-xl font-semibold text-gray-700 mb-2">Játékmód és Cél:</p>
+            <select id="objective-select" class="text-xl p-3 border-4 border-amber-100 rounded-2xl mb-6 w-full font-bold text-center focus:outline-none focus:border-amber-400 bg-white text-amber-900 shadow-inner cursor-pointer appearance-none">
+                <optgroup label="Időre (Cél: legtöbb pár)">
+                    <option value="time-30">30 másodperc</option>
+                    <option value="time-60" selected>1 perc</option>
+                    <option value="time-120">2 perc</option>
+                    <option value="time-180">3 perc</option>
+                    <option value="time-300">5 perc</option>
+                </optgroup>
+                <optgroup label="Párokra (Cél: legjobb idő)">
+                    <option value="pairs-10">10 pár</option>
+                    <option value="pairs-20">20 pár</option>
+                    <option value="pairs-31">31 pár (Fél pakli)</option>
+                    <option value="pairs-57">57 pár (Teljes pakli)</option>
+                </optgroup>
             </select>
 
             <p class="text-xl font-semibold text-gray-700 mb-2">Ikonok kártyánként:</p>
@@ -90,41 +101,38 @@
                 <option value="8" selected>8 ikon (Nehéz - Teljes pakli)</option>
             </select>
             
-            <button onclick="startNewGame()" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white font-bold py-4 px-8 rounded-2xl text-2xl shadow-[0_6px_0_#9a3412] active:shadow-[0_0px_0_#9a3412] active:translate-y-[6px] transition-all">
-                Játék Indítása
+            <button id="start-btn" onclick="startNewGame()" disabled class="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white font-bold py-4 px-8 rounded-2xl text-2xl shadow-[0_6px_0_#9a3412] active:shadow-[0_0px_0_#9a3412] active:translate-y-[6px] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Betöltés...
             </button>
         </div>
     </div>
 
     <!-- Játéktér UI -->
-    <div id="game-ui" class="hidden flex-col items-center w-full max-w-5xl mx-auto h-full justify-between z-10 py-8 px-4">
+    <div id="game-ui" class="hidden flex-row items-center w-full h-full justify-center gap-4 md:gap-8 z-10 py-4 px-4 mx-auto max-w-[1400px]">
         
-        <div class="flex items-center justify-between w-full px-2 md:px-8">
-            <div class="bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-amber-200 text-amber-900 font-bold text-2xl md:text-3xl flex items-center gap-2">
-                ⏱️ <span id="timer-display" class="drop-shadow-sm tracking-wider w-16 text-center">1:00</span>
+        <!-- Bal kártya -->
+        <div id="card1" class="card w-[42vw] max-w-[550px] aspect-square rounded-full bg-white relative border-8 md:border-[16px] border-white flex-shrink-0"></div>
+
+        <!-- Középső UI (Idő felül, Pont alul) -->
+        <div class="flex flex-col items-center justify-between h-[42vw] max-h-[550px] py-4 md:py-10 flex-shrink-0">
+            <div onclick="showSetup()" class="cursor-pointer bg-white/90 backdrop-blur-md px-3 py-3 md:px-6 md:py-6 rounded-3xl shadow-xl border-4 border-amber-200 text-amber-900 font-bold text-4xl md:text-6xl flex flex-col items-center justify-center transition-transform hover:scale-105 active:scale-95 select-none">
+                <span id="timer-display" class="drop-shadow-sm tracking-wider">1:00</span>
             </div>
-            <div class="bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-amber-200 text-amber-900 font-bold text-2xl md:text-3xl">
-                Párok: <span id="score" class="text-orange-600 drop-shadow-sm">0</span>
+            
+            <div onclick="showSetup()" class="cursor-pointer bg-white/90 backdrop-blur-md px-3 py-3 md:px-6 md:py-6 rounded-3xl shadow-xl border-4 border-amber-200 text-amber-900 font-bold text-4xl md:text-6xl flex flex-col items-center justify-center transition-transform hover:scale-105 active:scale-95 select-none">
+                <span id="score" class="text-orange-600 drop-shadow-sm">0</span>
             </div>
         </div>
 
-        <div class="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-20 w-full flex-grow my-4">
-            <div id="card1" class="card w-[280px] h-[280px] md:w-[350px] md:h-[350px] rounded-full bg-white relative border-8 border-white"></div>
-            <div id="card2" class="card w-[280px] h-[280px] md:w-[350px] md:h-[350px] rounded-full bg-white relative border-8 border-white"></div>
-        </div>
-
-        <div class="mb-4">
-            <button onclick="showSetup()" class="bg-white/90 backdrop-blur-md hover:bg-white text-amber-900 font-bold py-3 px-8 rounded-full text-xl shadow-lg border border-amber-200 transition-all">
-                Újraindítás
-            </button>
-        </div>
+        <!-- Jobb kártya -->
+        <div id="card2" class="card w-[42vw] max-w-[550px] aspect-square rounded-full bg-white relative border-8 md:border-[16px] border-white flex-shrink-0"></div>
     </div>
 
-    <!-- Idő lejárta -->
+    <!-- Idő lejárta / Cél elérve -->
     <div id="game-over" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl p-8 md:p-12 text-center max-w-lg w-full shadow-2xl transform scale-105 border-4 border-orange-400">
-            <h2 class="text-5xl font-extrabold text-orange-600 mb-4 drop-shadow-sm">Lejárt az idő!</h2>
-            <div class="text-3xl font-bold mb-8 text-gray-700">
+            <h2 id="end-title" class="text-5xl font-extrabold text-orange-600 mb-4 drop-shadow-sm">Lejárt az idő!</h2>
+            <div id="end-subtitle" class="text-3xl font-bold mb-8 text-gray-700">
                 Megtalált párok száma: <br>
                 <span id="final-score" class="text-7xl text-amber-500 drop-shadow-md mt-4 block">0</span>
             </div>
@@ -135,19 +143,35 @@
     </div>
 
     <script>
-        // --- 57 MÁRTON-NAPI / ŐSZI SZIMBÓLUM ---
-        // Ha saját GitHub képet szeretnél használni, egyszerűen cserélj ki egy emojit a képed linkjére!
-        // Pl.: "🦆" HELYETT ÍRD EZT: "https://raw.githubusercontent.com/.../liba.png"
-        // A játék automatikusan tudni fogja, hogy linket kapott, és képként jeleníti meg!
-        
-        const SYMBOLS = [
-            "🦆", "🦢", "🏮", "🕯️", "🏇", "🧥", "⚔️", "🛡️", "⛪", "🔥", // 1-10: Libák, lovag, lámpás, tábortűz
-            "🍂", "🍁", "🌰", "🎃", "🍇", "🍷", "🍗", "🥖", "🌧️", "☔", // 11-20: Ősz, libacomb, bor, gesztenye
-            "🧣", "🧤", "👢", "🌙", "⭐", "☁️", "🌾", "🌻", "🧺", "🍎", // 21-30: Ruházat, éjszaka, termés
-            "🍏", "🍐", "🧅", "🥨", "🧀", "🍲", "🛖", "🏕️", "👑", "📿", // 31-40: Ételek, kunyhó, püspök(korona)
-            "🪙", "🦔", "🦊", "🦉", "🐎", "🦅", "🌲", "🌳", "🪵", "🪓", // 41-50: Koldus(érme), erdei állatok, fa
-            "🍯", "🏺", "🕰️", "🔔", "🎶", "🧑‍🦯", "🤝"                   // 51-57: Harang, zene, koldus, megosztás
+        const FALLBACK_EMOJIS = [
+            "🦆", "🦢", "🏮", "🕯️", "🏇", "🧥", "⚔️", "🛡️", "⛪", "🔥",
+            "🍂", "🍁", "🌰", "🎃", "🍇", "🍷", "🍗", "🥖", "🌧️", "☔",
+            "🧣", "🧤", "👢", "🌙", "⭐", "☁️", "🌾", "🌻", "🧺", "🍎",
+            "🍏", "🍐", "🧅", "🥨", "🧀", "🍲", "🏕️", "👑", "📿", "🦔",
+            "🦊", "🦉", "🐎", "🦅", "🌲", "🌳", "🪓", "🍯", "🏺", "🕰️",
+            "🔔", "🎶", "🤝", "🧑‍🌾", "🐴", "🏰", "🪙"
         ];
+
+        let SYMBOLS = [];
+        let fetchedRawSymbols = [];
+        const JSON_URL = 'https://kittitanitoneni.github.io/dobble/pic.json';
+        const BASE_IMAGE_URL = 'https://kittitanitoneni.github.io/dobble/';
+
+        // Szimbólumok betöltése induláskor a JSON-ből (vagy fallback az emojikra hiba esetén)
+        window.addEventListener('DOMContentLoaded', async () => {
+            const startBtn = document.getElementById('start-btn');
+            try {
+                const response = await fetch(JSON_URL);
+                if (!response.ok) throw new Error("Nem sikerült letölteni a JSON fájlt.");
+                fetchedRawSymbols = await response.json();
+            } catch (err) {
+                console.warn("Hiba a JSON betöltésekor, alapértelmezett emojik használata:", err);
+                fetchedRawSymbols = FALLBACK_EMOJIS.map(e => ({ emoji: e }));
+            } finally {
+                startBtn.disabled = false;
+                startBtn.innerText = "Játék Indítása";
+            }
+        });
 
         let deck = [];
         let currentCard1 = [];
@@ -156,7 +180,12 @@
         let isAnimating = false;
         let timerInterval;
         let timeLeft = 0;
+        let timeElapsed = 0;
+        let gameMode = 'time';
+        let targetPairs = 0;
         let currentN = 5;
+
+        let SYMBOL_ANGLES = {};
 
         let fullDeck = [];
         let symbolsList = [];
@@ -224,21 +253,33 @@
             return `${m}:${s.toString().padStart(2, '0')}`;
         }
 
-        // Biztonságos pozíciók a kártyán az egymásra lógás elkerülésére
+        // Biztonságos pozíciók a kártyán az egymásra lógás és a kártyáról lelógás elkerülésére
         function getPositions(k) {
             if (k === 3) {
-                return [ {x: 50, y: 25}, {x: 25, y: 70}, {x: 75, y: 70} ];
+                return [ {x: 50, y: 30}, {x: 30, y: 65}, {x: 70, y: 65} ];
             } else if (k === 4) {
-                return [ {x: 30, y: 30}, {x: 70, y: 30}, {x: 30, y: 70}, {x: 70, y: 70} ];
+                return [ {x: 32, y: 32}, {x: 68, y: 32}, {x: 32, y: 68}, {x: 68, y: 68} ];
             } else if (k === 6) {
+                // 1 középen, 5 körben (sugár: ~28%)
                 return [
-                    {x: 50, y: 50}, {x: 50, y: 15}, {x: 82, y: 40},
-                    {x: 70, y: 78}, {x: 30, y: 78}, {x: 18, y: 40}
+                    {x: 50, y: 50},
+                    {x: 50, y: 20},
+                    {x: 78, y: 40},
+                    {x: 67, y: 73},
+                    {x: 33, y: 73},
+                    {x: 22, y: 40}
                 ];
             } else {
+                // 1 középen, 7 körben (sugár: ~30%)
                 return [
-                    {x: 32, y: 32}, {x: 68, y: 32}, {x: 32, y: 68}, {x: 68, y: 68},
-                    {x: 50, y: 12}, {x: 88, y: 50}, {x: 50, y: 88}, {x: 12, y: 50}
+                    {x: 50, y: 50},
+                    {x: 50, y: 18},
+                    {x: 75, y: 28},
+                    {x: 82, y: 55},
+                    {x: 65, y: 79},
+                    {x: 35, y: 79},
+                    {x: 18, y: 55},
+                    {x: 25, y: 28}
                 ];
             }
         }
@@ -310,12 +351,42 @@
         }
 
         function startNewGame() {
-            const timeSelect = document.getElementById('time-select');
+            const objectiveSelect = document.getElementById('objective-select').value;
             const iconsSelect = document.getElementById('icons-select');
             
-            timeLeft = parseInt(timeSelect.value, 10);
+            const objParts = objectiveSelect.split('-');
+            gameMode = objParts[0];
+            const objValue = parseInt(objParts[1], 10);
+            
+            if (gameMode === 'time') {
+                timeLeft = objValue;
+            } else {
+                targetPairs = objValue;
+                timeElapsed = 0;
+            }
+            
             const k = parseInt(iconsSelect.value, 10);
             currentN = k - 1; 
+
+            // --- Szimbólumok feltöltése a JSON-ből a kiválasztott nehézség alapján ---
+            const requiredCount = currentN * currentN + currentN + 1;
+            SYMBOLS = [];
+            SYMBOL_ANGLES = {};
+            for(let i = 0; i < requiredCount; i++) {
+                let item = fetchedRawSymbols[i];
+                let sym = "❓";
+                let maxA = 180;
+                
+                if (item) {
+                    if (item.pic) sym = BASE_IMAGE_URL + item.pic;
+                    else if (item.emoji) sym = item.emoji;
+                    
+                    if (typeof item.maxangle === 'number') maxA = item.maxangle;
+                }
+                
+                SYMBOLS.push(sym);
+                SYMBOL_ANGLES[sym] = maxA;
+            }
             
             setupScreen.classList.add('hidden');
             gameOverModal.classList.add('hidden');
@@ -324,7 +395,11 @@
             
             score = 0;
             scoreEl.textContent = score;
-            timerDisplay.textContent = formatTime(timeLeft);
+            if (gameMode === 'time') {
+                timerDisplay.textContent = formatTime(timeLeft);
+            } else {
+                timerDisplay.textContent = formatTime(timeElapsed);
+            }
             
             // Játéktér és ciklusok intelligens felépítése
             fullDeck = generateDeck(currentN);
@@ -354,10 +429,15 @@
             
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                timeLeft--;
-                timerDisplay.textContent = formatTime(timeLeft);
-                if (timeLeft <= 0) {
-                    endGame();
+                if (gameMode === 'time') {
+                    timeLeft--;
+                    timerDisplay.textContent = formatTime(timeLeft);
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                } else {
+                    timeElapsed++;
+                    timerDisplay.textContent = formatTime(timeElapsed);
                 }
             }, 1000);
         }
@@ -383,26 +463,34 @@
             const shuffledSymbols = shuffle([...cardData]);
             const k = cardData.length;
             
-            const baseWidth = k <= 4 ? 35 : (k <= 6 ? 26 : 20); 
+            // Kisebb, négyzetes befoglaló doboz (bounding box) méretek
+            const baseSize = k <= 3 ? 32 : (k <= 4 ? 28 : (k <= 6 ? 24 : 19)); 
             let positions = shuffle([...getPositions(k)]);
 
             shuffledSymbols.forEach((symbol, index) => {
                 const img = createSymbolImage(symbol);
                 const pos = positions[index];
                 
-                const maxJitter = k <= 4 ? 3 : 1.5; 
+                // Kisebb eltolás (jitter) a biztonságos zónák szigorú megtartásáért
+                const maxJitter = 1.0; 
                 const jitterX = (Math.random() * maxJitter * 2) - maxJitter;
                 const jitterY = (Math.random() * maxJitter * 2) - maxJitter;
 
                 const x = pos.x + jitterX;
                 const y = pos.y + jitterY;
                 
-                const sizeMod = 0.85 + Math.random() * 0.35; 
-                const rotation = Math.floor(Math.random() * 360);
+                // Finomított méretmódosítás (0.8x - 1.1x)
+                const sizeMod = 0.8 + Math.random() * 0.3; 
+                
+                const maxA = SYMBOL_ANGLES[symbol] !== undefined ? SYMBOL_ANGLES[symbol] : 180;
+                const rotation = (Math.random() * maxA * 2) - maxA;
                 
                 img.style.left = `${x}%`;
                 img.style.top = `${y}%`;
-                img.style.width = `${baseWidth * sizeMod}%`;
+                
+                // KULCS: Szélesség ÉS magasság beállítása egyforma százalékra, így biztosan dobozban marad
+                img.style.width = `${baseSize * sizeMod}%`;
+                img.style.height = `${baseSize * sizeMod}%`;
                 img.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
                 
                 img.onclick = () => handleSymbolClick(symbol);
@@ -416,7 +504,7 @@
         }
 
         function handleSymbolClick(clickedSymbol) {
-            if (isAnimating || timeLeft <= 0) return;
+            if (isAnimating || (gameMode === 'time' && timeLeft <= 0)) return;
 
             const match = currentCard1.find(sym => currentCard2.includes(sym));
 
@@ -424,6 +512,19 @@
                 isAnimating = true;
                 score++;
                 scoreEl.textContent = score;
+
+                // Ha "Párokra" módban vagyunk és elértük a célt
+                if (gameMode === 'pairs' && score >= targetPairs) {
+                    card1El.classList.add('animate-correct');
+                    card2El.classList.add('animate-correct');
+                    setTimeout(() => {
+                        card1El.classList.remove('animate-correct');
+                        card2El.classList.remove('animate-correct');
+                        isAnimating = false;
+                        endGame();
+                    }, 400); 
+                    return;
+                }
 
                 card1El.classList.add('animate-correct');
                 card2El.classList.add('animate-correct');
@@ -476,7 +577,13 @@
 
         function endGame() {
             clearInterval(timerInterval);
-            finalScoreEl.textContent = score;
+            if (gameMode === 'time') {
+                document.getElementById('end-title').textContent = "Lejárt az idő!";
+                document.getElementById('end-subtitle').innerHTML = `Megtalált párok száma: <br><span class="text-7xl text-amber-500 drop-shadow-md mt-4 block">${score}</span>`;
+            } else {
+                document.getElementById('end-title').textContent = "Cél elérve!";
+                document.getElementById('end-subtitle').innerHTML = `Eredményed: <br><span class="text-7xl text-amber-500 drop-shadow-md mt-4 block">${formatTime(timeElapsed)}</span>`;
+            }
             gameOverModal.classList.remove('hidden');
         }
     </script>
