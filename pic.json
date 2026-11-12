@@ -1,8 +1,8 @@
 [
-  { "pic": "Konteneriskola.jpg" , "maxangle": 45 },
-  { "pic": "Iskola.jpg" , "maxangle": 0 },
-  { "pic": "Templom.jpg" },
-  { "pic": "Muvelodesihaz.jpg" },
+  { "pic": "Konteneriskola.jpg" , "maxangle": 15 },
+  { "pic": "Iskola.jpg" , "maxangle": 5 },
+  { "pic": "Templom.jpg" , "maxangle": 30 },
+  { "pic": "Muvelodesihaz.jpg" , "maxangle": 45 },
   { "pic": "Marton02.png" },
   { "pic": "Tuz01.png" },
   { "pic": "Liba04.png" },
