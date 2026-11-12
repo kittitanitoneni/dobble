@@ -185,6 +185,8 @@
         let targetPairs = 0;
         let currentN = 5;
 
+        let SYMBOL_ANGLES = {};
+
         let fullDeck = [];
         let symbolsList = [];
         let matchQueue = [];
@@ -369,15 +371,21 @@
             // --- Szimbólumok feltöltése a JSON-ből a kiválasztott nehézség alapján ---
             const requiredCount = currentN * currentN + currentN + 1;
             SYMBOLS = [];
+            SYMBOL_ANGLES = {};
             for(let i = 0; i < requiredCount; i++) {
                 let item = fetchedRawSymbols[i];
-                if (!item) {
-                    SYMBOLS.push("❓"); // Biztonsági tartalék, ha nincs elég adat a fájlban
-                } else if (item.pic) {
-                    SYMBOLS.push(BASE_IMAGE_URL + item.pic);
-                } else if (item.emoji) {
-                    SYMBOLS.push(item.emoji);
+                let sym = "❓";
+                let maxA = 180;
+                
+                if (item) {
+                    if (item.pic) sym = BASE_IMAGE_URL + item.pic;
+                    else if (item.emoji) sym = item.emoji;
+                    
+                    if (typeof item.maxangle === 'number') maxA = item.maxangle;
                 }
+                
+                SYMBOLS.push(sym);
+                SYMBOL_ANGLES[sym] = maxA;
             }
             
             setupScreen.classList.add('hidden');
@@ -473,7 +481,9 @@
                 
                 // Finomított méretmódosítás (0.8x - 1.1x)
                 const sizeMod = 0.8 + Math.random() * 0.3; 
-                const rotation = Math.floor(Math.random() * 360);
+                
+                const maxA = SYMBOL_ANGLES[symbol] !== undefined ? SYMBOL_ANGLES[symbol] : 180;
+                const rotation = (Math.random() * maxA * 2) - maxA;
                 
                 img.style.left = `${x}%`;
                 img.style.top = `${y}%`;
