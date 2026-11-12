@@ -1,6 +1,6 @@
 [
   { "pic": "Konteneriskola.jpg" , "maxangle": 45 },
-  { "pic": "Iskola.jpg" },
+  { "pic": "Iskola.jpg" , "maxangle": 0 },
   { "pic": "Templom.jpg" },
   { "pic": "Muvelodesihaz.jpg" },
   { "pic": "Marton02.png" },
