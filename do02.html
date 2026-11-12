@@ -186,6 +186,7 @@
         let currentN = 5;
 
         let SYMBOL_ANGLES = {};
+        let SYMBOL_TRANSLATIONS = {};
 
         let fullDeck = [];
         let symbolsList = [];
@@ -368,10 +369,18 @@
             const k = parseInt(iconsSelect.value, 10);
             currentN = k - 1; 
 
+            // iOS és asztali böngészők audio feloldása az első interakciókor
+            if ('speechSynthesis' in window) {
+                let dummy = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(dummy);
+                window.speechSynthesis.cancel();
+            }
+
             // --- Szimbólumok feltöltése a JSON-ből a kiválasztott nehézség alapján ---
             const requiredCount = currentN * currentN + currentN + 1;
             SYMBOLS = [];
             SYMBOL_ANGLES = {};
+            SYMBOL_TRANSLATIONS = {};
             for(let i = 0; i < requiredCount; i++) {
                 let item = fetchedRawSymbols[i];
                 let sym = "❓";
@@ -382,6 +391,11 @@
                     else if (item.emoji) sym = item.emoji;
                     
                     if (typeof item.maxangle === 'number') maxA = item.maxangle;
+                    
+                    // Ha a json sorában van 'hu' vagy 'en', elmentjük a szótárunkba
+                    if (item.hu || item.en) {
+                        SYMBOL_TRANSLATIONS[sym] = { hu: item.hu, en: item.en };
+                    }
                 }
                 
                 SYMBOLS.push(sym);
@@ -493,58 +507,103 @@
                 img.style.height = `${baseSize * sizeMod}%`;
                 img.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
                 
-                img.onclick = () => handleSymbolClick(symbol);
+                // Átadjuk az elem ID-jét is, hogy tudjuk, bal (card1) vagy jobb (card2) kártyát nyomtak meg
+                img.onclick = () => handleSymbolClick(symbol, element.id);
                 img.ontouchstart = (e) => {
                     e.preventDefault(); 
-                    handleSymbolClick(symbol);
+                    handleSymbolClick(symbol, element.id);
                 };
                 
                 element.appendChild(img);
             });
         }
 
-        function handleSymbolClick(clickedSymbol) {
+        function finishCorrectMatch() {
+            card1El.classList.remove('animate-correct');
+            card2El.classList.remove('animate-correct');
+            
+            if (gameMode === 'pairs' && score >= targetPairs) {
+                isAnimating = false;
+                endGame();
+            } else {
+                nextRound();
+                isAnimating = false;
+            }
+        }
+
+        function finishWrongMatch() {
+            card1El.classList.remove('animate-wrong');
+            card2El.classList.remove('animate-wrong');
+            isAnimating = false;
+        }
+
+        function speakText(text, lang, onEnd) {
+            if (!('speechSynthesis' in window)) {
+                if (onEnd) onEnd();
+                return;
+            }
+            
+            window.speechSynthesis.cancel(); // Előző esetleges beszéd megszakítása
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.rate = 0.85; // Egy picit lassabb, tisztább kiejtés gyerekeknek
+            
+            let speechFinished = false;
+            const finish = () => {
+                if (!speechFinished) {
+                    speechFinished = true;
+                    if (onEnd) onEnd();
+                }
+            };
+
+            utterance.onend = finish;
+            utterance.onerror = finish;
+
+            // Biztonsági időzítő, ha a böngésző vagy telefon megakadna (max 3.5 másodperc)
+            setTimeout(finish, 3500);
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function handleSymbolClick(clickedSymbol, cardId) {
             if (isAnimating || (gameMode === 'time' && timeLeft <= 0)) return;
 
             const match = currentCard1.find(sym => currentCard2.includes(sym));
+            const translations = SYMBOL_TRANSLATIONS[clickedSymbol];
 
             if (clickedSymbol === match) {
                 isAnimating = true;
                 score++;
                 scoreEl.textContent = score;
 
-                // Ha "Párokra" módban vagyunk és elértük a célt
-                if (gameMode === 'pairs' && score >= targetPairs) {
-                    card1El.classList.add('animate-correct');
-                    card2El.classList.add('animate-correct');
-                    setTimeout(() => {
-                        card1El.classList.remove('animate-correct');
-                        card2El.classList.remove('animate-correct');
-                        isAnimating = false;
-                        endGame();
-                    }, 400); 
-                    return;
-                }
-
                 card1El.classList.add('animate-correct');
                 card2El.classList.add('animate-correct');
 
-                setTimeout(() => {
-                    card1El.classList.remove('animate-correct');
-                    card2El.classList.remove('animate-correct');
-                    nextRound();
-                    isAnimating = false;
-                }, 400); 
+                // Helyes találat és van magyar + angol fordítás is
+                if (translations && translations.hu && translations.en) {
+                    speakText(translations.hu, 'hu-HU', () => {
+                        speakText(translations.en, 'en-US', finishCorrectMatch);
+                    });
+                } else {
+                    setTimeout(finishCorrectMatch, 400); 
+                }
             } else {
                 isAnimating = true;
                 card1El.classList.add('animate-wrong');
                 card2El.classList.add('animate-wrong');
 
-                setTimeout(() => {
-                    card1El.classList.remove('animate-wrong');
-                    card2El.classList.remove('animate-wrong');
-                    isAnimating = false;
-                }, 400);
+                // Tévesztés a BAL kártyán (Magyarul olvassa fel)
+                if (cardId === 'card1' && translations && translations.hu) {
+                    speakText(translations.hu, 'hu-HU', finishWrongMatch);
+                
+                // Tévesztés a JOBB kártyán (Angolul olvassa fel)
+                } else if (cardId === 'card2' && translations && translations.en) {
+                    speakText(translations.en, 'en-US', finishWrongMatch);
+                
+                } else {
+                    setTimeout(finishWrongMatch, 400);
+                }
             }
         }
 
